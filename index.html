@@ -705,9 +705,11 @@ function checkPwd() {
   const pwd = document.getElementById('modal-pwd').value;
   if (pwd === PASSWORDS[currentTarget]) {
     closeModal();
-    alert('✅ Senha correta! Redirecionando...
-
-(O app será carregado aqui quando publicado na Vercel)');
+    if (currentTarget === 'orcamentos') {
+      window.location.href = '/orcamentos.html';
+    } else {
+      alert('Lista de Pedidos em breve!');
+    }
   } else {
     document.getElementById('modal-error').style.display = 'block';
     document.getElementById('modal-pwd').value = '';

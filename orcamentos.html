@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pabimi — Orçamentos</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: sans-serif; background: #faf7f2; }
+  #lock {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-height(135deg, #2c1810, #3d2b1f);
+    background: #3d2b1f;
+  }
+  .lock-box {
+    background: #fff; border-radius: 20px; padding: 40px;
+    width: min(380px, 90vw); text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .lock-box h2 { color: #2c1810; font-size: 22px; margin-bottom: 8px; }
+  .lock-box p { color: #9a7a65; font-size: 14px; margin-bottom: 24px; }
+  .lock-box input {
+    width: 100%; padding: 13px 16px; border: 2px solid #e8dcd0;
+    border-radius: 12px; font-size: 16px; margin-bottom: 12px;
+    outline: none; transition: border-color .2s;
+  }
+  .lock-box input:focus { border-color: #8b5e3c; }
+  .lock-box button {
+    width: 100%; padding: 13px; background: #3d2b1f; color: #fff;
+    border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+  }
+  .lock-box button:hover { background: #8b5e3c; }
+  .error { color: #c0392b; font-size: 13px; margin-top: 8px; display: none; }
+  .logo { font-size: 32px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div id="lock">
+  <div class="lock-box">
+    <div class="logo">🪵</div>
+    <h2>Pabimi — Orçamentos</h2>
+    <p>Digite a senha para acessar</p>
+    <input type="password" id="pwd" placeholder="Senha" onkeydown="if(event.key==='Enter')check()">
+    <p class="error" id="err">Senha incorreta. Tente novamente.</p>
+    <button onclick="check()">Entrar</button>
+    <p style="margin-top:16px;font-size:13px;color:#9a7a65"><a href="/" style="color:#8b5e3c">← Voltar ao site</a></p>
+  </div>
+</div>
+<div id="app" style="display:none"></div>
+
+<script type="text/babel" data-type="module" id="appscript"></script>
+
+<script>
+const SENHA = 'pabimi2026';
+let unlocked = false;
+
+function check() {
+  if (document.getElementById('pwd').value === SENHA) {
+    document.getElementById('lock').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    if (!unlocked) { unlocked = true; loadApp(); }
+  } else {
+    document.getElementById('err').style.display = 'block';
+    document.getElementById('pwd').value = '';
+    document.getElementById('pwd').focus();
+  }
+}
+
+function loadApp() {
+  fetch('pabimi_v5.jsx')
+    .then(r => r.text())
+    .then(code => {
+      const script = document.createElement('script');
+      script.type = 'text/babel';
+      script.setAttribute('data-presets', 'react');
+      script.textContent = code + `
+        const rootEl = document.getElementById('app');
+        const root = ReactDOM.createRoot(rootEl);
+        root.render(React.createElement(App));
+      `;
+      document.body.appendChild(script);
+      Babel.transformScriptTags();
+    });
+}
+</script>
+</body>
+</html>
