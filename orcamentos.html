@@ -12,7 +12,6 @@
   body { font-family: sans-serif; background: #faf7f2; }
   #lock {
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: linear-height(135deg, #2c1810, #3d2b1f);
     background: #3d2b1f;
   }
   .lock-box {
@@ -35,33 +34,38 @@
   }
   .lock-box button:hover { background: #8b5e3c; }
   .error { color: #c0392b; font-size: 13px; margin-top: 8px; display: none; }
-  .logo { font-size: 32px; margin-bottom: 16px; }
+  .logo { font-size: 36px; margin-bottom: 16px; }
+  #loading { display:none; padding:40px; text-align:center; color:#8b5e3c; font-size:16px; }
+  #app-error { display:none; padding:30px; color:red; background:#fff3f3; margin:20px; border-radius:8px; }
 </style>
 </head>
 <body>
+
 <div id="lock">
   <div class="lock-box">
     <div class="logo">🪵</div>
     <h2>Pabimi — Orçamentos</h2>
     <p>Digite a senha para acessar</p>
     <input type="password" id="pwd" placeholder="Senha" onkeydown="if(event.key==='Enter')check()">
-    <p class="error" id="err">Senha incorreta. Tente novamente.</p>
-    <button onclick="check()">Entrar</button>
-    <p style="margin-top:16px;font-size:13px;color:#9a7a65"><a href="/" style="color:#8b5e3c">← Voltar ao site</a></p>
+    <div class="error" id="err">Senha incorreta. Tente novamente.</div>
+    <button onclick="check()" style="margin-top:12px">Entrar</button>
+    <p style="margin-top:20px;font-size:13px"><a href="/" style="color:#8b5e3c">← Voltar ao site</a></p>
   </div>
 </div>
-<div id="app" style="display:none"></div>
 
-<script type="text/babel" data-type="module" id="appscript"></script>
+<div id="loading">⏳ Carregando sistema de orçamentos...</div>
+<div id="app-error"></div>
+<div id="app" style="display:none"></div>
 
 <script>
 const SENHA = '197500';
 let unlocked = false;
 
 function check() {
-  if (document.getElementById('pwd').value === SENHA) {
+  const val = document.getElementById('pwd').value;
+  if (val === SENHA) {
     document.getElementById('lock').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
+    document.getElementById('loading').style.display = 'block';
     if (!unlocked) { unlocked = true; loadApp(); }
   } else {
     document.getElementById('err').style.display = 'block';
@@ -71,26 +75,77 @@ function check() {
 }
 
 function loadApp() {
-  fetch('/pabimi_v5.jsx', { cache: 'no-store' })
+  fetch('pabimi_v5.jsx')
     .then(r => {
-      if (!r.ok) throw new Error('Não encontrei /pabimi_v5.jsx no servidor. Status: ' + r.status);
+      if (!r.ok) throw new Error('Arquivo não encontrado (HTTP ' + r.status + ')');
       return r.text();
     })
-    .then(code => {
-      const script = document.createElement('script');
-      script.type = 'text/babel';
-      script.setAttribute('data-presets', 'react');
-      script.textContent = code + `
-        const rootEl = document.getElementById('app');
-        const root = ReactDOM.createRoot(rootEl);
-        root.render(React.createElement(App));
-      `;
-      document.body.appendChild(script);
-      Babel.transformScriptTags();
+    .then(jsx => {
+      // Ensure React global is available (Babel helper)
+      if (!window.__REACT_LOADED__) {
+        window.__REACT_LOADED__ = true;
+      }
+
+      let code = jsx;
+
+      // 1. Remove/comment out existing imports (they're already at the top)
+      code = code.replace(
+        /const\s*\{\s*useState\s*,\s*useMemo\s*,\s*useRef\s*,\s*useEffect\s*,\s*useCallback\s*\}\s*=\s*React\s*;/g,
+        '// React hooks already available via React global'
+      );
+
+      // 2. Remove ES module imports if they somehow got in
+      code = code.replace(/import\s*\{([^}]+)\}\s*from\s*['"]react['"]\s*;?/g,
+        (_, imports) => `const { ${imports.trim()} } = React;`);
+
+      // 3. Remove export default
+      code = code.replace(/export\s+default\s+function\s+/g, 'function ');
+      code = code.replace(/export\s+(function|const|class|let|var)\s+/g, '$1 ');
+
+      // 4. Add React hooks re-declaration and render at the end
+      code = `
+// Ensure hooks are available
+const { useState, useMemo, useRef, useEffect, useCallback } = React;
+
+${code}
+
+// Render App
+;(function(){
+  const rootEl = document.getElementById('app');
+  if (!rootEl) throw new Error('No #app element found');
+  const root = ReactDOM.createRoot(rootEl);
+  root.render(React.createElement(App));
+})();
+`;
+
+      console.log('Code prepared for Babel transformation...');
+
+      // 5. Transform with Babel
+      try {
+        const transformed = Babel.transform(code, {
+          presets: ['react'],
+          filename: 'pabimi.jsx'
+        }).code;
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+
+        console.log('Executing transformed code...');
+        // eslint-disable-next-line no-eval
+        eval(transformed);
+        console.log('✅ App loaded successfully');
+
+      } catch(babelErr) {
+        throw new Error('Babel transformation failed: ' + babelErr.message);
+      }
     })
     .catch(err => {
-      console.error(err);
-      document.getElementById('app').innerHTML = '<div style="padding:30px;color:#c0392b;font-family:sans-serif"><b>Erro ao carregar o app de orçamentos.</b><br>' + err.message + '</div>';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app-error').style.display = 'block';
+      document.getElementById('app-error').innerHTML =
+        '<strong>Erro ao carregar o sistema:</strong><br>' + err.message +
+        '<br><br><a href="/">← Voltar ao site</a>';
+      console.error('❌ Fatal error:', err);
     });
 }
 </script>
